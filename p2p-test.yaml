@@ -1,0 +1,143 @@
+# Copyright 2024 Google Inc. All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  generateName: p2p-
+  namespace: default
+  labels:
+    kueue.x-k8s.io/queue-name: a3-ultra
+spec:
+  ttlSecondsAfterFinished: 1200
+  suspend: False
+  network:
+    enableDNSHostnames: true
+  replicatedJobs:
+  - name: p2p
+    template:
+      spec:
+        parallelism: 4
+        completions: 4
+
+        template:
+          metadata:
+            annotations:
+              kueue.x-k8s.io/podset-preferred-topology: "kubernetes.io/hostname"
+              networking.gke.io/default-interface: 'eth0'
+              networking.gke.io/interfaces: |
+                [
+                  {"interfaceName":"eth0","network":"default"},
+                  {"interfaceName":"eth1","network":"gvnic-1"},
+                  {"interfaceName":"eth2","network":"rdma-0"},
+                  {"interfaceName":"eth3","network":"rdma-1"},
+                  {"interfaceName":"eth4","network":"rdma-2"},
+                  {"interfaceName":"eth5","network":"rdma-3"},
+                  {"interfaceName":"eth6","network":"rdma-4"},
+                  {"interfaceName":"eth7","network":"rdma-5"},
+                  {"interfaceName":"eth8","network":"rdma-6"},
+                  {"interfaceName":"eth9","network":"rdma-7"}
+                ]
+          spec:
+            # Limit benchmark run duration
+            activeDeadlineSeconds: 3600
+            restartPolicy: Never
+            nodeSelector:
+              cloud.google.com/gke-nodepool: a3u-8g-nodepool
+            tolerations:
+            #- key: cloud.google.com/gke-queued
+            #  effect: NoSchedule
+            #  value: "true"
+
+            - key: "nvidia.com/gpu"
+              operator: "Exists"
+              effect: "NoSchedule"
+
+            setHostnameAsFQDN: true
+            volumes:
+            - name: gib
+              hostPath:
+                path: /home/kubernetes/bin/gib
+            - name: nvidia
+              hostPath:
+                path: /home/kubernetes/bin/nvidia
+            - name: lib64
+              hostPath:
+                path: /lib64
+            - name: shared-memory
+              emptyDir:
+                medium: "Memory"
+                sizeLimit: 250Gi
+            - name: sys
+              hostPath:
+                path: /sys
+            - name: proc-sys
+              hostPath:
+                path: /proc/sys
+
+            containers:
+            - name: nccl
+              stdin: true
+              tty: true
+              image: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.0.5
+              securityContext:
+                privileged: true
+              env:
+              - name: MY_NODE_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: spec.nodeName
+              - name: OMPI_ALLOW_RUN_AS_ROOT
+                value: "1"
+              - name: OMPI_ALLOW_RUN_AS_ROOT_CONFIRM
+                value: "1"
+              - name: LD_PRELOAD
+                value: "/usr/local/gib/lib64/libnccl.so.2.25.1"
+              - name: NCCL_DEBUG
+                value: INFO
+              - name: NCCL_DEBUG_SUBSYS
+                value: "INIT,PROFILE"
+              command:
+              - bash
+              - -c
+              - |
+                set -x
+               
+                # Install ping
+                apt update -y
+                apt install -y iputils-ping
+                export NCCL_NET=gIB
+                export LD_LIBRARY_PATH=/usr/local/gib/lib64/:${LD_LIBRARY_PATH}
+                export RANK=0
+                export WORLD_SIZE=8
+                export LOCAL_RANK=0
+
+                source /usr/local/gib/scripts/set_nccl_env.sh
+
+                sleep infinity
+                   
+                exit 0
+
+              volumeMounts:
+              - name: nvidia
+                mountPath: /usr/local/nvidia
+              - name: gib
+                mountPath: /usr/local/gib
+              - name: shared-memory
+                mountPath: /dev/shm
+              resources:
+                limits:
+                  nvidia.com/gpu: 8
+                requests:
+                  nvidia.com/gpu: 8
