@@ -15,11 +15,8 @@
 apiVersion: jobset.x-k8s.io/v1alpha2
 kind: JobSet
 metadata:
-  #generateName: p2p-
   namespace: default
-  name: nccl-p2p
-  #labels:
-  #  kueue.x-k8s.io/queue-name: a3-ultra
+  name: pytorch
 spec:
   ttlSecondsAfterFinished: 1200
   suspend: False
@@ -91,10 +88,12 @@ spec:
             - name: nccl
               stdin: true
               tty: true
-              image: us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.0.5
+              image: us-east4-docker.pkg.dev/diesel-patrol-382622/gke-llm/p2p-test:latest #us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.0.5
               securityContext:
                 privileged: true
               env:
+              - name: MASTER_ADDR
+                value: "pytorch-p2p-0-0.pytorch"
               - name: MY_NODE_NAME
                 valueFrom:
                   fieldRef:
@@ -120,13 +119,13 @@ spec:
                 apt install -y iputils-ping
                 export NCCL_NET=gIB
                 export LD_LIBRARY_PATH=/usr/local/gib/lib64/:${LD_LIBRARY_PATH}
-                export RANK=0
-                export WORLD_SIZE=8
-                export LOCAL_RANK=0
-
+                
                 source /usr/local/gib/scripts/set_nccl_env.sh
-
-                sleep infinity
+                cd /p2p-test
+                torchrun --rdzv_id=123 --nnodes=1 --nproc_per_node=8 --master_addr=$MASTER_ADDR --master_port=29501 --node_rank=$RANK p2p-test.py
+                
+ 
+                #sleep infinity
                    
                 exit 0
 

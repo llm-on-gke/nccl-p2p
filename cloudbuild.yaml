@@ -14,7 +14,7 @@
 # [START gke_ai_ml_maxdiffusion_build_server_cloudbuild]
 steps:
 - name: 'gcr.io/cloud-builders/docker'
-  args: [ 'build', '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/gke-llm/max-diffusion:latest', '.' ]
+  args: [ 'build', '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/gke-llm/p2p-test:latest', '.' ]
 images:
-- '$LOCATION-docker.pkg.dev/$PROJECT_ID/gke-llm/max-diffusion:latest'
+- '$LOCATION-docker.pkg.dev/$PROJECT_ID/gke-llm/p2p-test:latest'
 # [END gke_ai_ml_maxdiffusion_build_server_cloudbuild]

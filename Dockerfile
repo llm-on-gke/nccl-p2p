@@ -1,12 +1,8 @@
 
-FROM python:3.12-slim
-WORKDIR /app
+FROM  nvcr.io/nvidia/pytorch:24.12-py3
+WORKDIR /p2p-test
 RUN apt-get -y update
-RUN apt-get -y install git
-COPY requirements.txt ./
-RUN python -m pip install --upgrade pip
-RUN pip install -r requirements.txt
-RUN pip install git+https://github.com/google/maxdiffusion.git@v1
-COPY main.py ./
-EXPOSE 8000
-ENTRYPOINT ["python", "main.py"]
+RUN apt-get -y install iputils-ping numactl
+COPY p2p-test.py ./
+
+ENTRYPOINT ["/bin/bash"]
