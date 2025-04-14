@@ -14,11 +14,12 @@ def create_pairwise_groups_and_communicate():
     local_rank = int(os.environ.get('LOCAL_RANK', 0))
     torch.cuda.set_device(local_rank)
     device = f'cuda:{local_rank}'
-
+    
     # Dictionary to store group handles this rank is part of
     my_groups_info = []
     my_groups_handles = {} # Store actual group handles keyed by sorted(i,j) tuple
-
+    if rank >0:
+       return
     # Iterate through all possible pairs of ranks (i, j)
     print(f"Rank {rank}: Starting creation of {world_size * (world_size - 1)} potential pairwise groups...")
     for i in range(world_size):
@@ -31,9 +32,9 @@ def create_pairwise_groups_and_communicate():
             group = dist.new_group(ranks=ranks_in_group)
 
             # Store the handle if this rank is part of the group
-            if rank in ranks_in_group:
-                group_pair = tuple(ranks_in_group)
-                if group_pair not in my_groups_handles: # Store only once
+            #if rank in ranks_in_group:
+            group_pair = tuple(ranks_in_group)
+            if group_pair not in my_groups_handles: # Store only once
                     my_groups_info.append(group_pair)
                     my_groups_handles[group_pair] = group
 
@@ -69,25 +70,25 @@ def create_pairwise_groups_and_communicate():
         tensor_to_send = None
         tensor_to_recv = None
 
-        if rank == source_rank:
+        #if rank == source_rank:
             # Source process sends its rank
-            tensor_to_send = torch.tensor([float(rank)], dtype=torch.float32, device=device)
+        tensor_to_send = torch.tensor([float(rank)], dtype=torch.float32, device=device)
             # print(f"Rank {rank}: Sending my rank ({rank}) to peer {peer_rank} in group {group_pair}...")
-            dist.send(tensor=tensor_to_send, dst=peer_rank, group=group_handle)
+        dist.send(tensor=tensor_to_send, dst=peer_rank, group=group_handle)
             # print(f"Rank {rank}: Send to {peer_rank} in group {group_pair} completed.")
-            success_count += 1
-        else:
+        success_count += 1
+        #else:
             # Receiving process (destination)
             # Allocate tensor to receive into
-            tensor_to_recv = torch.tensor([-1.0], dtype=torch.float32, device=device)
+        tensor_to_recv = torch.tensor([-1.0], dtype=torch.float32, device=device)
             # print(f"Rank {rank}: Receiving from peer {peer_rank} (src) in group {group_pair}...")
-            dist.recv(tensor=tensor_to_recv, src=peer_rank, group=group_handle)
-            received_value = tensor_to_recv.item()
-            expected_value = float(peer_rank)
+        dist.recv(tensor=tensor_to_recv, src=peer_rank, group=group_handle)
+        received_value = tensor_to_recv.item()
+        expected_value = float(peer_rank)
             # print(f"Rank {rank}: Received {received_value} from {peer_rank} in group {group_pair}. Expected: {expected_value}.")
             # Use tolerance for float comparison
             # print(f"Rank {rank}: Receive from {peer_rank} in group {group_pair} verified.")
-            success_count += 1
+        success_count += 1
 
     print(f"Rank {rank}: Pairwise communication test finished. Successes: {success_count}, Failures: {fail_count}")
 
