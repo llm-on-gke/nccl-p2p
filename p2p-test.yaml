@@ -89,6 +89,7 @@ spec:
               stdin: true
               tty: true
               image: us-east4-docker.pkg.dev/diesel-patrol-382622/gke-llm/p2p-test:latest #us-docker.pkg.dev/gce-ai-infra/gpudirect-gib/nccl-plugin-gib-diagnostic:v1.0.5
+              imagePullPolicy: Always
               securityContext:
                 privileged: true
               env:
